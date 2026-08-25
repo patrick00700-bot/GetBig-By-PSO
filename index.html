@@ -110,6 +110,35 @@ th{color:var(--muted);font-size:12px} td.num,th.num{text-align:right}
   .grid3,.kpis{grid-template-columns:1fr}main{padding:16px 10px 50px}
   .targets{grid-template-columns:1fr 1fr}.top{padding-top:18px}
 }
+
+.recipePool{margin-top:12px}
+.recipePoolTitle{font-size:13px;color:var(--muted);font-weight:800;margin-bottom:8px}
+.recipeChoice{
+  display:grid;grid-template-columns:1fr 92px 78px;gap:10px;align-items:center;
+  padding:10px 11px;margin:6px 0;border:1px solid #293852;border-radius:11px;
+  background:#101a2b
+}
+.recipeChoice.selectedRecipe{border-color:#466ba8;background:#15233a}
+.recipeChoiceName{font-weight:750}
+.recipeChoiceMeta{font-size:11px;color:var(--muted);margin-top:2px}
+.qtyBox{display:flex;align-items:center;gap:4px}
+.qtyBtn{
+  width:28px;height:28px;padding:0;border:1px solid #34445f;border-radius:8px;
+  background:#1a2740;color:#fff;font-weight:900;cursor:pointer
+}
+.qtyInput{
+  width:36px!important;padding:5px 2px!important;text-align:center;border-radius:8px!important;
+}
+.selectedBadge{font-size:11px;color:var(--good);font-weight:800;text-align:right}
+.selectionSummary{
+  margin-top:11px;padding:10px 12px;border-radius:11px;background:#111d31;
+  border:1px solid #293852;color:var(--muted);font-size:12px
+}
+@media(max-width:760px){
+  .recipeChoice{grid-template-columns:1fr 92px}
+  .selectedBadge{display:none}
+}
+
 </style>
 </head>
 <body>
@@ -136,7 +165,7 @@ th{color:var(--muted);font-size:12px} td.num,th.num{text-align:right}
 <div class="progress"><i id="bar"></i></div>
 <div class="controls"><button class="action primary" onclick="preset2600()">2600-plan fordeling</button><button class="action" onclick="preset2400()">2400-plan fordeling</button><button class="action" onclick="equalize()">20 / 20 / 20 / 20 / 20</button><button class="action" onclick="fillLast()">Fyld sidste til 100 %</button></div>
 <div id="meals"></div>
-<div class="note">Vælg procent for hvert måltid og derefter en ret i dropdownen. Retten skaleres automatisk til måltidets kalorimål.</div>
+<div class="note">Vælg procent for hvert måltid og angiv derefter antal portioner af de retter, du vil have. Formiddag og frokost bruger samme retspulje. Appen skalerer de valgte portioner samlet til måltidets kalorimål.</div>
 </div>
 </section>
 
@@ -147,7 +176,7 @@ th{color:var(--muted);font-size:12px} td.num,th.num{text-align:right}
 <h2>Indkøbsliste</h2>
 <div class="grid3"><div><label>Antal dage</label><input id="shopDays" type="number" min="1" max="30" step="1" value="1"></div><div><label>Visning</label><select id="shopMode"><option value="day">Pr. dag</option><option value="total">Samlet for antal dage</option></select></div><div class="controls" style="align-items:end"><button class="action primary" onclick="window.print()">Print / gem som PDF</button></div></div>
 <div class="shop-actions"><button class="action" id="checkAll">✓ Markér alle som købt</button><button class="action" id="uncheckAll">Nulstil markering</button></div><div id="shopList" style="margin-top:16px"></div>
-<div class="note">Listen indeholder kun ingredienser fra de valgte retter. Samme ingrediens bliver lagt sammen.</div>
+<div class="note">Listen beregnes automatisk ud fra de antal portioner, du har valgt under hvert måltid. Formiddag og frokost bruger samme retspulje. e retter. Samme ingrediens bliver lagt sammen.</div>
 </div>
 </section>
 </main>
@@ -156,101 +185,231 @@ th{color:var(--muted);font-size:12px} td.num,th.num{text-align:right}
 const RECIPES = [{"meal": "Morgenmad", "name": "Skyr med müsli, frugt og chokolade", "kcal": 410, "p": 38, "c": 41, "f": 9, "ings": [["Skyr 0.2% fedt", 350, "g"], ["Blåbær", 100, "g"], ["Müsli", 20, "g"], ["Mørk chokolade 85%", 10, "g"]]}, {"meal": "Morgenmad", "name": "Jakob's proteinsmoothie m/ jordbær og banan", "kcal": 393, "p": 36, "c": 45, "f": 7, "ings": [["Skummetmælk 0.1% fedt", 250, "g"], ["Banan", 1, "stk"], ["Jordbær", 100, "g"], ["Proteinpulver", 30, "g"], ["Peanutbutter min. 99% peanuts", 10, "g"]]}, {"meal": "Morgenmad", "name": "Cheerios med mælk og jordbær", "kcal": 402, "p": 35, "c": 51, "f": 5, "ings": [["Skummetmælk", 250, "g"], ["Cheerios med fuldkorn", 40, "g"], ["Jordbær", 100, "g"], ["Proteinpulver", 30, "g"]]}, {"meal": "Morgenmad", "name": "Havregrød med frugt", "kcal": 415, "p": 32, "c": 52, "f": 7, "ings": [["Arla Proteindrik", 1, "stk"], ["Havregryn", 40, "g"], ["Blåbær", 50, "g"]]}, {"meal": "Morgenmad", "name": "Rugbrød med scrambled æg og tomat", "kcal": 418, "p": 37, "c": 38, "f": 10, "ings": [["Viking Rugbrød", 2, "skive"], ["Æggehvide", 150, "g"], ["Æg", 1, "stk"], ["Skinke", 50, "g"], ["Tomat", 100, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Morgenmad", "name": "Nem bolle med ost og pålæg", "kcal": 399, "p": 31, "c": 49, "f": 8, "ings": [["Levebrød Fuldkornsboller", 1, "stk"], ["Kyllingebryst pålæg", 50, "g"], ["Ost", 40, "g"], ["Agurk", 50, "g"], ["Æble", 1, "stk"]]}, {"meal": "Formiddag", "name": "Kylling med ris og grøntsager", "kcal": 429, "p": 41, "c": 39, "f": 12, "ings": [["Kyllingebryst", 150, "g"], ["Basmati ris", 40, "g"], ["Wokmix", 100, "g"], ["Peanuts", 10, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Formiddag", "name": "Pasta med pesto, kylling, ærter og tomat", "kcal": 430, "p": 39, "c": 40, "f": 12, "ings": [["Kyllingebryst", 120, "g"], ["Pasta", 40, "g"], ["Grønne ærter", 100, "g"], ["Tomat", 50, "g"], ["Pesto", 15, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Formiddag", "name": "Oksekød med ris og grøntsager", "kcal": 445, "p": 37, "c": 42, "f": 13, "ings": [["Hakket oksekød 4-7%", 120, "g"], ["Basmati ris", 40, "g"], ["Wokmix", 150, "g"], ["Æg", 1, "stk"]]}, {"meal": "Formiddag", "name": "Klassisk toast med skinke og ost", "kcal": 439, "p": 35, "c": 43, "f": 11, "ings": [["Toastbrød", 3, "skive"], ["Ost", 60, "g"], ["Kogt skinke", 50, "g"], ["Light ketchup", 20, "g"]]}, {"meal": "Formiddag", "name": "Nem baguette sandwich med kalkun og ost", "kcal": 427, "p": 37, "c": 43, "f": 10, "ings": [["Baguette", 70, "g"], ["Kyllingebryst pålæg", 60, "g"], ["Ost", 60, "g"], ["Agurk", 50, "g"], ["Tomat", 50, "g"], ["Salat", 20, "g"], ["Sandwich spread", 15, "g"]]}, {"meal": "Formiddag", "name": "Rugbrød med kylling og smørost", "kcal": 445, "p": 34, "c": 47, "f": 11, "ings": [["Viking Rugbrød", 2.5, "skive"], ["Kyllingebryst pålæg", 120, "g"], ["Philadelphia Light", 20, "g"], ["Tomat", 50, "g"], ["Mandler", 10, "g"]]}, {"meal": "Frokost", "name": "Nemme madpandekage med kylling, grønt og dressing", "kcal": 450, "p": 41, "c": 54, "f": 7, "ings": [["Tortilla", 1, "stk"], ["Færdig stegte kyllingestrimler", 150, "g"], ["Agurk", 50, "g"], ["Cherrytomat", 50, "g"], ["Salat", 30, "g"], ["Fedtreduceret hvidløgsdressing", 30, "g"], ["Æble", 1, "stk"]]}, {"meal": "Frokost", "name": "Madpandekage med oksekød og avocado", "kcal": 502, "p": 40, "c": 39, "f": 19, "ings": [["Tortilla", 1, "stk"], ["Hakket oksekød 4-7%", 150, "g"], ["Tomat", 50, "g"], ["Agurk", 50, "g"], ["Avocado", 40, "g"], ["Taco spice mix", 5, "g"], ["Fedtreduceret hvidløgsdressing", 30, "g"]]}, {"meal": "Frokost", "name": "Wok med kylling og peanutbutter", "kcal": 543, "p": 43, "c": 60, "f": 14, "ings": [["Kyllingebryst", 120, "g"], ["Basmati ris", 50, "g"], ["Wokmix", 150, "g"], ["Græsk yoghurt 2%", 80, "g"], ["Hvidløg", 2, "fed"], ["Peanutbutter", 10, "g"], ["Karry", 1, "tsk"], ["Paprika", 1, "tsk"], ["Olivenolie", 0.5, "tsk"]]}, {"meal": "Frokost", "name": "Nemme madpandekage med kylling, grønt og dressing (2.400-plan)", "kcal": 543, "p": 43, "c": 61, "f": 12, "ings": [["Tortilla", 1.5, "stk"], ["Færdig stegte kyllingestrimler", 140, "g"], ["Agurk", 80, "g"], ["Cherrytomat", 80, "g"], ["Peberfrugt", 80, "g"], ["Salat", 50, "g"], ["Creme fraiche dressing light", 25, "g"]]}, {"meal": "Eftermiddag (Pre Meal)", "name": "Coco pops og havregryn", "kcal": 596, "p": 37, "c": 86, "f": 10, "ings": [["Skummetmælk 0.1% fedt", 250, "g"], ["Coco Pops", 60, "g"], ["Havregryn", 30, "g"], ["Proteinpulver", 25, "g"], ["Mandler", 10, "g"]]}, {"meal": "Eftermiddag (Pre Meal)", "name": "Toast med peanutbutter og marmelade", "kcal": 582, "p": 37, "c": 72, "f": 13, "ings": [["Toastbrød", 120, "g"], ["Proteinpulver", 30, "g"], ["Marmelade", 30, "g"], ["Peanutbutter", 15, "g"]]}, {"meal": "Eftermiddag (Pre Meal)", "name": "Riskiks med banan, og proteinshake", "kcal": 583, "p": 36, "c": 86, "f": 9, "ings": [["Riskiks", 60, "g"], ["Banan", 100, "g"], ["Proteinpulver", 35, "g"], ["Marmelade", 30, "g"], ["Peanutbutter", 10, "g"]]}, {"meal": "Eftermiddag (Pre Meal)", "name": "Proteingrød med bær og chokolade", "kcal": 576, "p": 35, "c": 74, "f": 13, "ings": [["Havregryn", 85, "g"], ["Blåbær", 100, "g"], ["Proteinpulver", 30, "g"], ["Mørk chokolade 85%", 10, "g"]]}, {"meal": "Eftermiddag (Pre Meal)", "name": "Cream of rice med bær og chokolade", "kcal": 580, "p": 35, "c": 82, "f": 11, "ings": [["Cream of rice", 85, "g"], ["Blåbær", 100, "g"], ["Proteinpulver", 35, "g"], ["Mørk chokolade 85%", 15, "g"]]}, {"meal": "Eftermiddag (Pre Meal)", "name": "Bananpandekager med bær og honning", "kcal": 574, "p": 36, "c": 77, "f": 11, "ings": [["Banan", 150, "g"], ["Havregryn", 40, "g"], ["Æggehvide", 100, "g"], ["Æg", 1, "stk"], ["Proteinpulver", 15, "g"], ["Blåbær", 50, "g"], ["Akacie honning", 10, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Aftensmad", "name": "Hjemmelavet burger med pommes", "kcal": 727, "p": 48, "c": 95, "f": 15, "ings": [["Hakket oksekød 4-7%", 170, "g"], ["Burgerbolle", 1, "stk"], ["Kartoffel", 350, "g"], ["Tomat", 30, "g"], ["Løg", 30, "g"], ["Salat", 15, "g"], ["Sandwich spread", 10, "g"], ["Light ketchup", 30, "g"]]}, {"meal": "Aftensmad", "name": "Jakob's Cremet Pasta M/ Oksekød", "kcal": 719, "p": 52, "c": 101, "f": 13, "ings": [["Hakket oksekød 4-7%", 120, "g"], ["Pasta", 110, "g"], ["Pasta sauce", 100, "g"], ["Løg", 50, "g"], ["Skummetmælk 0.1% fedt", 50, "g"], ["Revet mozzarella 15%", 30, "g"], ["Hvidløg", 2, "fed"]]}, {"meal": "Aftensmad", "name": "Kylling i kokosmælk med ris og grøntsager", "kcal": 718, "p": 46, "c": 99, "f": 14, "ings": [["Kyllingebryst", 150, "g"], ["Basmati ris", 110, "g"], ["Wokmix", 150, "g"], ["Kokosmælk Light", 100, "g"], ["Karrypasta", 15, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Aftensmad", "name": "Poke bowl med teriyaki kylling, broccoli og peberfrugt", "kcal": 722, "p": 47, "c": 97, "f": 15, "ings": [["Kyllingebryst", 150, "g"], ["Jasmin ris rå", 110, "g"], ["Teriyaki sovs", 30, "g"], ["Broccoli", 80, "g"], ["Peberfrugt", 50, "g"], ["Avocado", 40, "g"], ["Sesamfrø", 0.5, "tsk"], ["Oliespray", 2, "g"]]}, {"meal": "Aftensmad", "name": "Jakob's simple chili con carne", "kcal": 736, "p": 49, "c": 106, "f": 11, "ings": [["Hakket oksekød 3-7%", 120, "g"], ["Jasmin ris", 100, "g"], ["Tomat", 100, "g"], ["Græsk yoghurt 0%", 80, "g"], ["Gulerod", 100, "g"], ["Kidneybønner", 30, "g"], ["Majs", 30, "g"], ["Hvidløg", 1, "fed"], ["Paprika", 0.5, "tsk"], ["Chili", 0.5, "tsk"], ["Olivenolie", 0.5, "tsk"]]}, {"meal": "Aftensmad", "name": "Simpel kylling med ris og grøntsager", "kcal": 699, "p": 47, "c": 97, "f": 13, "ings": [["Kyllingebryst", 150, "g"], ["Basmati ris", 100, "g"], ["Ananas", 100, "g"], ["Wokmix", 100, "g"], ["Peanuts", 10, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Aftensmad", "name": "Bøf med kartoffelfritter og bønner", "kcal": 721, "p": 48, "c": 90, "f": 18, "ings": [["Oksekød", 180, "g"], ["Kartoffel", 480, "g"], ["Grønne bønner", 100, "g"], ["Light ketchup", 30, "g"], ["Oliespray", 2, "g"]]}, {"meal": "Aftensmad", "name": "Nem burito med oksekød, salat og dressing", "kcal": 716, "p": 49, "c": 84, "f": 18, "ings": [["Hakket oksekød 4-7%", 150, "g"], ["Tortilla", 2.5, "stk"], ["Tomat", 80, "g"], ["Agurk", 80, "g"], ["Salat", 30, "g"], ["Fedtreduceret hvidløgsdressing", 50, "g"]]}, {"meal": "Aftensmad", "name": "Nem Pasta Kødsovs (2.400-plan)", "kcal": 528, "p": 47, "c": 58, "f": 12, "ings": [["Hakket oksekød 4-7%", 150, "g"], ["Pasta", 60, "g"], ["Pasta sauce", 100, "g"], ["Løg", 50, "g"], ["Revet mozzarella 13%", 20, "g"]]}, {"meal": "Aftensmad", "name": "Hjemmelavet kyllinge Shawarma (2.400-plan)", "kcal": 541, "p": 38, "c": 62, "f": 14, "ings": [["Kyllingekebab", 160, "g"], ["Tortilla", 1.5, "stk"], ["Tomat", 50, "g"], ["Agurk", 50, "g"], ["Salat", 50, "g"], ["Rødløg", 30, "g"], ["Fedtreduceret hvidløgsdressing", 40, "g"]]}];
 const mealNames = ["Morgenmad","Formiddag","Frokost","Eftermiddag (Pre Meal)","Aftensmad"];
 let shares = [16,17,17,22,28];
-let selected = [0,6,13,18,24];
+
+const mealGroups = {
+  "Morgenmad": r => r.meal === "Morgenmad",
+  "Formiddag": r => r.meal === "Formiddag" || r.meal === "Frokost",
+  "Frokost": r => r.meal === "Formiddag" || r.meal === "Frokost",
+  "Eftermiddag (Pre Meal)": r => r.meal === "Eftermiddag (Pre Meal)",
+  "Aftensmad": r => r.meal === "Aftensmad"
+};
+
+const defaultRecipeIds = [0,6,13,18,24];
+let choices = mealNames.map((meal, mi) => {
+  const pool = RECIPES.map((r,i)=>({r,i})).filter(x=>mealGroups[meal](x.r));
+  const wanted = defaultRecipeIds[mi];
+  const obj = {};
+  if (pool.some(x=>x.i===wanted)) obj[wanted] = 1;
+  else if (pool[0]) obj[pool[0].i] = 1;
+  return obj;
+});
+
 let checked = JSON.parse(localStorage.getItem("patrick-kostplan-shopping-checked") || "{}");
 function saveChecked(){localStorage.setItem("patrick-kostplan-shopping-checked", JSON.stringify(checked))}
 
-function fmt(n,d=1){return Number(n).toLocaleString("da-DK",{minimumFractionDigits:d,maximumFractionDigits:d})}
+function fmt(n,d=1){
+  return Number(n).toLocaleString("da-DK",{minimumFractionDigits:d,maximumFractionDigits:d})
+}
 function roundQty(n,unit){
- if(unit==="stk"||unit==="skive"||unit==="fed"||unit==="tsk") return (Math.round(n*10)/10).toLocaleString("da-DK",{maximumFractionDigits:1});
- return Math.round(n).toLocaleString("da-DK");
+  if(unit==="stk"||unit==="skive"||unit==="fed"||unit==="tsk")
+    return (Math.round(n*10)/10).toLocaleString("da-DK",{maximumFractionDigits:1});
+  return Math.round(n).toLocaleString("da-DK");
 }
 function macroTargets(){
- const kcal=Number(document.getElementById("calories").value)||0;
- if(document.getElementById("profile").value==="ratio") return {p:kcal*.30/4,c:kcal*.50/4,f:kcal*.20/9};
- const x1=2388,x2=2584,t=(kcal-x1)/(x2-x1);
- return {p:194.1+(195.1-194.1)*t,c:262.5+(307.6-262.5)*t,f:55.8+(55.5-55.8)*t};
+  const kcal=Number(document.getElementById("calories").value)||0;
+  if(document.getElementById("profile").value==="ratio")
+    return {p:kcal*.30/4,c:kcal*.50/4,f:kcal*.20/9};
+  const x1=2388,x2=2584,t=(kcal-x1)/(x2-x1);
+  return {
+    p:194.1+(195.1-194.1)*t,
+    c:262.5+(307.6-262.5)*t,
+    f:55.8+(55.5-55.8)*t
+  };
 }
-function recipeOptions(meal,idx){
- return RECIPES.map((r,i)=>({r,i})).filter(x=>x.r.meal===meal).map(x=>`<option value="${x.i}" ${x.i===selected[idx]?"selected":""}>${x.r.name} – ${x.r.kcal} kcal</option>`).join("");
+function poolFor(meal){
+  return RECIPES.map((r,i)=>({r,i})).filter(x=>mealGroups[meal](x.r));
+}
+function selectedEntries(mealIndex){
+  return Object.entries(choices[mealIndex])
+    .map(([id,count])=>({i:+id,count:+count,r:RECIPES[+id]}))
+    .filter(x=>x.r && x.count>0);
+}
+function mealCalculation(mealIndex){
+  const kcal=Number(document.getElementById("calories").value)||0;
+  const t=macroTargets(), share=shares[mealIndex];
+  const targetKcal=kcal*share/100;
+  const target={p:t.p*share/100,c:t.c*share/100,f:t.f*share/100};
+  const entries=selectedEntries(mealIndex);
+  const baseKcal=entries.reduce((sum,x)=>sum+x.count*x.r.kcal,0);
+  const factor=baseKcal>0 ? targetKcal/baseKcal : 0;
+  let p=0,c=0,f=0;
+  entries.forEach(x=>{
+    p+=x.count*x.r.p*factor;
+    c+=x.count*x.r.c*factor;
+    f+=x.count*x.r.f*factor;
+  });
+  return {targetKcal,target,factor,entries,p,c,f,baseKcal};
+}
+function recipeChoiceHTML(mealIndex){
+  const meal=mealNames[mealIndex], pool=poolFor(meal);
+  return pool.map(({r,i})=>{
+    const count=choices[mealIndex][i]||0, active=count>0;
+    return `<div class="recipeChoice ${active?"selectedRecipe":""}">
+      <div>
+        <div class="recipeChoiceName">${r.name}</div>
+        <div class="recipeChoiceMeta">${r.kcal} kcal · ${fmt(r.p)} P · ${fmt(r.c)} K · ${fmt(r.f)} F pr. portion</div>
+      </div>
+      <div class="qtyBox">
+        <button class="qtyBtn" data-action="minus" data-meal="${mealIndex}" data-recipe="${i}">−</button>
+        <input class="qtyInput" type="number" min="0" max="10" step="1" value="${count}" data-meal="${mealIndex}" data-recipe="${i}" aria-label="Antal ${r.name}">
+        <button class="qtyBtn" data-action="plus" data-meal="${mealIndex}" data-recipe="${i}">+</button>
+      </div>
+      <div class="selectedBadge">${active?count+" × valgt":"Ikke valgt"}</div>
+    </div>`;
+  }).join("");
 }
 function renderMeals(){
- const t=macroTargets(), kcal=Number(document.getElementById("calories").value)||0, box=document.getElementById("meals"); box.innerHTML="";
- mealNames.forEach((meal,i)=>{
-  const s=shares[i], mk=kcal*s/100, p=t.p*s/100,c=t.c*s/100,f=t.f*s/100, r=RECIPES[selected[i]], factor=mk/r.kcal;
-  const rp=r.p*factor,rc=r.c*factor,rf=r.f*factor,pdev=(rp-p)/p*100,cdev=(rc-c)/c*100,fdev=(rf-f)/f*100;
-  const div=document.createElement("div");div.className="meal";
-  div.innerHTML=`
-  <div class="mealhead">
-   <div><h3>${meal}</h3><div class="muted">Mål: ${Math.round(mk)} kcal · ${fmt(p)} P · ${fmt(c)} K · ${fmt(f)} F</div></div>
-   <div><label>Andel af dagen</label><select class="shareSel" data-i="${i}">${Array.from({length:101},(_,x)=>`<option value="${x}" ${x===s?"selected":""}>${x} %</option>`).join("")}</select></div>
-   <div class="pct">${s} %</div>
-  </div>
-  <div class="recipeRow">
-   <div><label>Vælg ret</label><select class="recipeSel" data-i="${i}">${recipeOptions(meal,i)}</select></div>
-   <div class="status">Valgt ret: <b>${r.name}</b><br>Skaleres med faktor <b>${fmt(factor,2)}×</b></div>
-  </div>
-  <div class="targets">
-   <div class="target"><small>Kalorier</small><b>${Math.round(mk)} kcal</b></div>
-   <div class="target protein"><small>Protein fra retten</small><b class="${Math.abs(pdev)>10?"warn":"good"}">${fmt(rp)} g (${pdev>=0?"+":""}${fmt(pdev,0)}%)</b></div>
-   <div class="target carbs"><small>Kulhydrat fra retten</small><b class="${Math.abs(cdev)>10?"warn":"good"}">${fmt(rc)} g (${cdev>=0?"+":""}${fmt(cdev,0)}%)</b></div>
-   <div class="target fat"><small>Fedt fra retten</small><b class="${Math.abs(fdev)>10?"warn":"good"}">${fmt(rf)} g (${fdev>=0?"+":""}${fmt(fdev,0)}%)</b></div>
-  </div>`;
-  box.appendChild(div);
- });
- box.querySelectorAll(".shareSel").forEach(x=>x.addEventListener("change",e=>{shares[+e.target.dataset.i]=+e.target.value;update()}));
- box.querySelectorAll(".recipeSel").forEach(x=>x.addEventListener("change",e=>{selected[+e.target.dataset.i]=+e.target.value;update()}));
+  const t=macroTargets(), kcal=Number(document.getElementById("calories").value)||0;
+  const box=document.getElementById("meals"); box.innerHTML="";
+  mealNames.forEach((meal,i)=>{
+    const s=shares[i], calc=mealCalculation(i);
+    const {targetKcal,target,factor,entries,p,c,f}=calc;
+    const pdev=target.p ? (p-target.p)/target.p*100 : 0;
+    const cdev=target.c ? (c-target.c)/target.c*100 : 0;
+    const fdev=target.f ? (f-target.f)/target.f*100 : 0;
+    const selectedText=entries.length
+      ? entries.map(x=>`${x.count} × ${x.r.name}`).join(" · ")
+      : "Ingen retter valgt endnu";
+    const div=document.createElement("div"); div.className="meal";
+    div.innerHTML=`
+      <div class="mealhead">
+        <div>
+          <h3>${meal}</h3>
+          <div class="muted">Mål: ${Math.round(targetKcal)} kcal · ${fmt(target.p)} P · ${fmt(target.c)} K · ${fmt(target.f)} F</div>
+        </div>
+        <div>
+          <label>Andel af dagen</label>
+          <select class="shareSel" data-i="${i}">
+            ${Array.from({length:201},(_,x)=>x/2).map(x=>`<option value="${x}" ${x===s?"selected":""}>${x} %</option>`).join("")}
+          </select>
+        </div>
+        <div class="pct">${s} %</div>
+      </div>
+
+      <div class="recipePool">
+        <div class="recipePoolTitle">${(meal==="Formiddag"||meal==="Frokost") ? "Fælles retspulje for formiddag + frokost" : "Vælg antal portioner af hver ret"}</div>
+        ${recipeChoiceHTML(i)}
+      </div>
+
+      <div class="selectionSummary">
+        <b>Valgte retter:</b> ${selectedText}<br>
+        <span>Portioner i måltidet: ${entries.reduce((a,x)=>a+x.count,0)} · Samlet grundlag: ${Math.round(calc.baseKcal)} kcal · Automatisk skaleringsfaktor: ${fmt(factor,2)}×</span>
+      </div>
+
+      <div class="targets">
+        <div class="target"><small>Kalorier</small><b>${Math.round(targetKcal)} kcal</b></div>
+        <div class="target protein"><small>Protein fra valgte retter</small><b class="${Math.abs(pdev)>10?"warn":"good"}">${fmt(p)} g (${pdev>=0?"+":""}${fmt(pdev,0)}%)</b></div>
+        <div class="target carbs"><small>Kulhydrat fra valgte retter</small><b class="${Math.abs(cdev)>10?"warn":"good"}">${fmt(c)} g (${cdev>=0?"+":""}${fmt(cdev,0)}%)</b></div>
+        <div class="target fat"><small>Fedt fra valgte retter</small><b class="${Math.abs(fdev)>10?"warn":"good"}">${fmt(f)} g (${fdev>=0?"+":""}${fmt(fdev,0)}%)</b></div>
+      </div>`;
+    box.appendChild(div);
+  });
+
+  box.querySelectorAll(".shareSel").forEach(x=>x.addEventListener("change",e=>{
+    shares[+e.target.dataset.i]=+e.target.value; update();
+  }));
+  box.querySelectorAll(".qtyBtn").forEach(btn=>btn.addEventListener("click",e=>{
+    const meal=+btn.dataset.meal, recipe=+btn.dataset.recipe;
+    const old=choices[meal][recipe]||0;
+    const next=btn.dataset.action==="plus" ? Math.min(10,old+1) : Math.max(0,old-1);
+    if(next===0) delete choices[meal][recipe]; else choices[meal][recipe]=next;
+    update();
+  }));
+  box.querySelectorAll(".qtyInput").forEach(inp=>inp.addEventListener("change",e=>{
+    const meal=+e.target.dataset.meal, recipe=+e.target.dataset.recipe;
+    const next=Math.max(0,Math.min(10,Math.round(+e.target.value||0)));
+    if(next===0) delete choices[meal][recipe]; else choices[meal][recipe]=next;
+    update();
+  }));
 }
 function update(){
- const t=macroTargets(),k=+document.getElementById("calories").value||0,total=shares.reduce((a,b)=>a+b,0);
- document.getElementById("pVal").textContent=fmt(t.p)+" g";document.getElementById("cVal").textContent=fmt(t.c)+" g";document.getElementById("fVal").textContent=fmt(t.f)+" g";document.getElementById("kVal").textContent=Math.round(k).toLocaleString("da-DK");
- const pct=document.getElementById("totalPct");pct.textContent=total+"%";pct.className="totalnum "+(total>100?"bad":total===100?"good":"warn");
- const bar=document.getElementById("bar");bar.style.width=Math.min(total,100)+"%";bar.style.background=total>100?"var(--bad)":total===100?"var(--good)":"var(--warn)";
- renderMeals();renderDay();renderShop();
+  const t=macroTargets(),k=+document.getElementById("calories").value||0,total=shares.reduce((a,b)=>a+b,0);
+  document.getElementById("pVal").textContent=fmt(t.p)+" g";
+  document.getElementById("cVal").textContent=fmt(t.c)+" g";
+  document.getElementById("fVal").textContent=fmt(t.f)+" g";
+  document.getElementById("kVal").textContent=Math.round(k).toLocaleString("da-DK");
+  const pct=document.getElementById("totalPct");
+  pct.textContent=total+"%";
+  pct.className="totalnum "+(total>100?"bad":total===100?"good":"warn");
+  const bar=document.getElementById("bar");
+  bar.style.width=Math.min(total,100)+"%";
+  bar.style.background=total>100?"var(--bad)":total===100?"var(--good)":"var(--warn)";
+  renderMeals();renderDay();renderShop();
 }
 function preset2600(){shares=[16,17,17,22,28];update()}
 function preset2400(){shares=[16.5,22.5,22.5,16,22.5];update()}
 function equalize(){shares=[20,20,20,20,20];update()}
 function fillLast(){shares[4]=Math.max(0,100-shares.slice(0,4).reduce((a,b)=>a+b,0));update()}
+
 function renderDay(){
- const k=+document.getElementById("calories").value||0,t=macroTargets();
- document.getElementById("dayIntro").textContent=`${Math.round(k).toLocaleString("da-DK")} kcal · ${fmt(t.p)} g protein · ${fmt(t.c)} g kulhydrat · ${fmt(t.f)} g fedt`;
- const box=document.getElementById("dayPlan");box.innerHTML="";
- mealNames.forEach((meal,i)=>{
-  const r=RECIPES[selected[i]],mk=k*shares[i]/100,factor=mk/r.kcal,div=document.createElement("div");div.className="planMeal";
-  const rows=r.ings.map(([name,qty,unit])=>`<tr><td>${name}</td><td class="num">${roundQty(qty*factor,unit)}</td><td>${unit}</td></tr>`).join("");
-  div.innerHTML=`<div class="planHead"><div><b>${meal}</b><div class="muted">${r.name}</div></div><div><b>${Math.round(mk)} kcal</b><br><span class="muted">Faktor ${fmt(factor,2)}×</span></div></div>
-  <div class="planBody"><table><thead><tr><th>Ingrediens</th><th class="num">Mængde</th><th>Enhed</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  box.appendChild(div);
- });
+  const k=+document.getElementById("calories").value||0,t=macroTargets();
+  document.getElementById("dayIntro").textContent=`${Math.round(k).toLocaleString("da-DK")} kcal · ${fmt(t.p)} g protein · ${fmt(t.c)} g kulhydrat · ${fmt(t.f)} g fedt`;
+  const box=document.getElementById("dayPlan");box.innerHTML="";
+  mealNames.forEach((meal,i)=>{
+    const calc=mealCalculation(i);
+    const div=document.createElement("div");div.className="planMeal";
+    const recipeBlocks=calc.entries.length ? calc.entries.map(x=>{
+      const rows=x.r.ings.map(([name,qty,unit])=>
+        `<tr><td>${name}</td><td class="num">${roundQty(qty*calc.factor*x.count,unit)}</td><td>${unit}</td></tr>`).join("");
+      return `<div style="margin-bottom:16px">
+        <div style="font-weight:800;margin-bottom:6px">${x.count} × ${x.r.name}</div>
+        <table><thead><tr><th>Ingrediens</th><th class="num">Samlet mængde</th><th>Enhed</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    }).join("") : `<div class="muted">Ingen retter valgt til dette måltid.</div>`;
+    div.innerHTML=`<div class="planHead">
+      <div><b>${meal}</b><div class="muted">${calc.entries.length} forskellige retter · ${calc.entries.reduce((a,x)=>a+x.count,0)} portioner</div></div>
+      <div><b>${Math.round(calc.targetKcal)} kcal</b><br><span class="muted">Faktor ${fmt(calc.factor,2)}×</span></div>
+    </div><div class="planBody">${recipeBlocks}</div>`;
+    box.appendChild(div);
+  });
 }
 function shopKey(x){return x.name+"||"+x.unit}
-function renderShop(){
- const days=Math.max(1,+document.getElementById("shopDays").value||1),mode=document.getElementById("shopMode").value,mult=mode==="total"?days:1,k=+document.getElementById("calories").value||0,agg={};
- mealNames.forEach((meal,i)=>{
-  const r=RECIPES[selected[i]],factor=(k*shares[i]/100)/r.kcal;
-  r.ings.forEach(([name,qty,unit])=>{const key=name+"||"+unit;if(!agg[key])agg[key]={name,qty:0,unit};agg[key].qty+=qty*factor});
- });
- const items=Object.values(agg).sort((a,b)=>a.name.localeCompare(b.name,"da"));
- const doneCount=items.filter(x=>checked[shopKey(x)]).length;
- const rows=items.map(x=>{
-   const key=shopKey(x), done=!!checked[key];
-   return `<div class="shopitem ${done?"done":""}">
-     <div><input class="shopcheck" type="checkbox" data-key="${key.replace(/"/g,'&quot;')}" ${done?"checked":""} aria-label="Markér ${x.name} som købt"></div>
-     <div class="shopname">${x.name}</div>
-     <div class="right">${roundQty(x.qty*mult,x.unit)}</div>
-     <div>${x.unit}</div>
-   </div>`;
- }).join("");
- document.getElementById("shopList").innerHTML=
-   `<div class="muted" style="margin-bottom:10px">${doneCount} af ${items.length} varer markeret som købt</div>
-    <div class="shopping"><div class="hd"></div><div class="hd">Ingrediens</div><div class="hd right">Mængde</div><div class="hd">Enhed</div>${rows}</div>`;
- document.querySelectorAll(".shopcheck").forEach(cb=>cb.addEventListener("change",e=>{
-   const key=e.target.dataset.key;
-   if(e.target.checked) checked[key]=true; else delete checked[key];
-   saveChecked(); renderShop();
- }));
+function buildShopping(){
+  const k=+document.getElementById("calories").value||0,agg={};
+  mealNames.forEach((meal,i)=>{
+    const calc=mealCalculation(i);
+    calc.entries.forEach(x=>{
+      x.r.ings.forEach(([name,qty,unit])=>{
+        const key=name+"||"+unit;
+        if(!agg[key])agg[key]={name,qty:0,unit};
+        agg[key].qty+=qty*calc.factor*x.count;
+      });
+    });
+  });
+  return Object.values(agg).sort((a,b)=>a.name.localeCompare(b.name,"da"));
 }
+function renderShop(){
+  const days=Math.max(1,+document.getElementById("shopDays").value||1);
+  const mode=document.getElementById("shopMode").value,mult=mode==="total"?days:1;
+  const items=buildShopping(),doneCount=items.filter(x=>checked[shopKey(x)]).length;
+  const rows=items.map(x=>{
+    const key=shopKey(x),done=!!checked[key];
+    return `<div class="shopitem ${done?"done":""}">
+      <div><input class="shopcheck" type="checkbox" data-key="${key.replace(/"/g,'&quot;')}" ${done?"checked":""} aria-label="Markér ${x.name} som købt"></div>
+      <div class="shopname">${x.name}</div>
+      <div class="right">${roundQty(x.qty*mult,x.unit)}</div><div>${x.unit}</div>
+    </div>`;
+  }).join("");
+  document.getElementById("shopList").innerHTML=
+    `<div class="muted" style="margin-bottom:10px">${doneCount} af ${items.length} varer markeret som købt</div>
+     <div class="shopping"><div class="hd"></div><div class="hd">Ingrediens</div><div class="hd right">Mængde</div><div class="hd">Enhed</div>${rows}</div>`;
+  document.querySelectorAll(".shopcheck").forEach(cb=>cb.addEventListener("change",e=>{
+    const key=e.target.dataset.key;
+    if(e.target.checked) checked[key]=true; else delete checked[key];
+    saveChecked(); renderShop();
+  }));
+}
+
 document.querySelectorAll("nav button").forEach(btn=>btn.addEventListener("click",()=>{
  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));btn.classList.add("active");
  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));document.getElementById(btn.dataset.tab).classList.add("active");
@@ -259,9 +418,8 @@ document.getElementById("calories").addEventListener("input",update);document.ge
 document.getElementById("days").addEventListener("input",()=>{document.getElementById("shopDays").value=document.getElementById("days").value;renderShop()});
 document.getElementById("shopDays").addEventListener("input",renderShop);document.getElementById("shopMode").addEventListener("change",renderShop);
 document.getElementById("checkAll").addEventListener("click",()=>{
- const days=Math.max(1,+document.getElementById("shopDays").value||1),mode=document.getElementById("shopMode").value,k=+document.getElementById("calories").value||0,agg={};
- mealNames.forEach((meal,i)=>{const r=RECIPES[selected[i]],factor=(k*shares[i]/100)/r.kcal;r.ings.forEach(([name,qty,unit])=>{const key=name+"||"+unit;if(!agg[key])agg[key]={name,qty:0,unit};agg[key].qty+=qty*factor})});
- Object.values(agg).forEach(x=>checked[shopKey(x)]=true);saveChecked();renderShop();
+  buildShopping().forEach(x=>checked[shopKey(x)]=true);
+  saveChecked();renderShop();
 });
 document.getElementById("uncheckAll").addEventListener("click",()=>{checked={};saveChecked();renderShop();});
 
